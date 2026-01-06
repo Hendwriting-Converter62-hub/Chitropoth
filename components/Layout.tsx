@@ -19,6 +19,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, setPage, user, c
   const navigate = (page: Page) => {
     setPage(page);
     setIsMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSubscribe = (e: React.FormEvent) => {
@@ -213,19 +214,19 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, setPage, user, c
               <h3 className="text-[10px] font-black text-white uppercase tracking-[0.4em] mb-8">The Studio</h3>
               <ul className="space-y-4 text-xs font-medium tracking-wider">
                 <li><button onClick={() => navigate(Page.Shop)} className="hover:text-[#F7E479] transition-colors text-left">Our Full Collection</button></li>
-                <li><button onClick={() => navigate(Page.Shop)} className="hover:text-[#F7E479] transition-colors text-left">Limited Releases</button></li>
+                <li><button onClick={() => navigate(Page.LimitedReleases)} className="hover:text-[#F7E479] transition-colors text-left">Limited Releases</button></li>
                 <li><button onClick={() => navigate(Page.Blog)} className="hover:text-[#F7E479] transition-colors text-left">Artisan Journal</button></li>
-                <li><a href="#" className="hover:text-[#F7E479] transition-colors">Meet the Masters</a></li>
+                <li><button onClick={() => navigate(Page.Masters)} className="hover:text-[#F7E479] transition-colors text-left">Meet the Masters</button></li>
               </ul>
             </div>
 
             <div>
               <h3 className="text-[10px] font-black text-white uppercase tracking-[0.4em] mb-8">Curator Service</h3>
               <ul className="space-y-4 text-xs font-medium tracking-wider">
-                <li><a href="#" className="hover:text-[#F7E479] transition-colors">Journey Logistics</a></li>
-                <li><a href="#" className="hover:text-[#F7E479] transition-colors">Studio Returns</a></li>
-                <li><a href="#" className="hover:text-[#F7E479] transition-colors">Ethical Sourcing</a></li>
-                <li><a href="#" className="hover:text-[#F7E479] transition-colors">Contact Curator</a></li>
+                <li><button onClick={() => navigate(Page.JourneyLogistics)} className="hover:text-[#F7E479] transition-colors text-left">Journey Logistics</button></li>
+                <li><button onClick={() => navigate(Page.StudioReturns)} className="hover:text-[#F7E479] transition-colors text-left">Studio Returns</button></li>
+                <li><button onClick={() => navigate(Page.EthicalSourcing)} className="hover:text-[#F7E479] transition-colors text-left">Ethical Sourcing</button></li>
+                <li><button onClick={() => navigate(Page.ContactCurator)} className="hover:text-[#F7E479] transition-colors text-left">Contact Curator</button></li>
               </ul>
             </div>
 
@@ -262,8 +263,8 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, setPage, user, c
           <div className="border-t border-white/5 pt-10 flex flex-col md:flex-row justify-between items-center text-[9px] uppercase tracking-[0.3em] text-stone-500 font-black gap-6">
             <p className="text-center md:text-left">© 2024 Citropoth Studio. Every Pixel Crafted with Soul.</p>
             <div className="flex space-x-8">
-              <a href="#" className="hover:text-[#F5A18C] transition-colors">Privacy Policy</a>
-              <a href="#" className="hover:text-[#F5A18C] transition-colors">Terms of Craft</a>
+              <button onClick={() => navigate(Page.Privacy)} className="hover:text-[#F5A18C] transition-colors">Privacy Policy</button>
+              <button onClick={() => navigate(Page.Terms)} className="hover:text-[#F5A18C] transition-colors">Terms of Craft</button>
               <a href="#" className="hover:text-[#F5A18C] transition-colors">Sustainability</a>
             </div>
           </div>

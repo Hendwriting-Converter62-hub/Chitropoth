@@ -8,6 +8,7 @@ export interface Product {
   image: string;
   rating: number;
   reviews: Review[];
+  isLimited?: boolean;
 }
 
 export interface Review {
@@ -33,6 +34,15 @@ export interface CartItem extends Product {
   quantity: number;
 }
 
+export interface Order {
+  id: string;
+  userEmail: string;
+  items: CartItem[];
+  total: number;
+  date: string;
+  status: 'Initiated' | 'Processing' | 'Delivered' | 'Shipped';
+}
+
 export interface User {
   name: string;
   email: string;
@@ -50,5 +60,13 @@ export enum Page {
   Checkout = 'checkout',
   Auth = 'auth',
   Admin = 'admin',
-  Profile = 'profile'
+  Profile = 'profile',
+  Privacy = 'privacy',
+  Terms = 'terms',
+  Masters = 'masters',
+  LimitedReleases = 'limited-releases',
+  EthicalSourcing = 'ethical-sourcing',
+  ContactCurator = 'contact-curator',
+  JourneyLogistics = 'journey-logistics',
+  StudioReturns = 'studio-returns'
 }

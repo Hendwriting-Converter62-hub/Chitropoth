@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Page, Product, BlogPost, CartItem, User, Review, Order } from './types.ts';
 import { MOCK_PRODUCTS, MOCK_BLOGS } from './constants.tsx';
@@ -950,7 +951,7 @@ const AuthView: React.FC<{
           {!isLogin && (
             <input 
               required type="text" placeholder="FULL NAME" 
-              value={name} onChange={setName}
+              value={name} onChange={e => setName(e.target.value)}
               className="w-full bg-stone-50 border border-stone-200 p-4 rounded-2xl text-[10px] font-bold tracking-widest uppercase focus:ring-1 focus:ring-[#F5A18C] outline-none" 
             />
           )}
@@ -998,6 +999,60 @@ const AdminView: React.FC<{
   onDeleteBlog: (id: string) => void;
 }> = ({ products, blogs, user, registeredUsers, onAddProduct, onUpdateProduct, onDeleteProduct, onAddBlog, onUpdateBlog, onDeleteBlog }) => {
   const [tab, setTab] = useState<'products' | 'blogs' | 'users'>('products');
+  const [showProductForm, setShowProductForm] = useState(false);
+  const [showBlogForm, setShowBlogForm] = useState(false);
+
+  // Form states for Product
+  const [pName, setPName] = useState('');
+  const [pPrice, setPPrice] = useState('');
+  const [pCategory, setPCategory] = useState<Product['category']>('Ceramics');
+  const [pImage, setPImage] = useState('');
+  const [pDesc, setPDesc] = useState('');
+  const [pIsLimited, setPIsLimited] = useState(false);
+
+  // Form states for Blog
+  const [bTitle, setBTitle] = useState('');
+  const [bExcerpt, setBExcerpt] = useState('');
+  const [bContent, setBContent] = useState('');
+  const [bCategory, setBCategory] = useState('');
+  const [bImage, setBImage] = useState('');
+
+  const handleAddProduct = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newP: Product = {
+      id: Date.now().toString(),
+      name: pName,
+      price: parseFloat(pPrice),
+      category: pCategory,
+      image: pImage || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=600',
+      description: pDesc,
+      rating: 5,
+      reviews: [],
+      isLimited: pIsLimited
+    };
+    onAddProduct(newP);
+    setShowProductForm(false);
+    // Reset form
+    setPName(''); setPPrice(''); setPDesc(''); setPImage(''); setPIsLimited(false);
+  };
+
+  const handleAddBlog = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newB: BlogPost = {
+      id: 'b' + Date.now().toString(),
+      title: bTitle,
+      excerpt: bExcerpt,
+      content: bContent,
+      category: bCategory,
+      author: user.name || 'Chief Artisan',
+      date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+      image: bImage || 'https://images.unsplash.com/photo-1459749411177-0421800673e6?auto=format&fit=crop&q=80&w=800'
+    };
+    onAddBlog(newB);
+    setShowBlogForm(false);
+    // Reset form
+    setBTitle(''); setBExcerpt(''); setBContent(''); setBCategory(''); setBImage('');
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-16 animate-in fade-in duration-500">
@@ -1019,74 +1074,131 @@ const AdminView: React.FC<{
         </div>
       </div>
 
-      <div className="bg-white border border-stone-100 rounded-[2.5rem] shadow-sm overflow-hidden">
+      <div className="bg-white border border-stone-100 rounded-[2.5rem] shadow-sm overflow-hidden p-8">
         {tab === 'products' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-stone-50 border-b border-stone-100">
-                <tr className="text-[9px] font-black uppercase tracking-widest text-stone-400">
-                  <th className="px-6 py-4">Piece</th>
-                  <th className="px-6 py-4">Category</th>
-                  <th className="px-6 py-4">Price</th>
-                  <th className="px-6 py-4">Limited</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-50">
-                {products.map(p => (
-                  <tr key={p.id} className="hover:bg-stone-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg overflow-hidden bg-stone-100">
-                           <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
-                        </div>
-                        <span className="font-serif text-sm">{p.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-[10px] font-bold text-stone-600 uppercase tracking-widest">{p.category}</td>
-                    <td className="px-6 py-4 font-light text-sm">${p.price.toFixed(2)}</td>
-                    <td className="px-6 py-4">
-                       {p.isLimited ? <span className="text-[8px] font-black uppercase tracking-widest bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Yes</span> : <span className="text-[8px] font-black uppercase tracking-widest bg-stone-100 text-stone-400 px-2 py-0.5 rounded">No</span>}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                       <button onClick={() => onDeleteProduct(p.id)} className="text-stone-400 hover:text-red-500 transition-colors text-[10px] font-black uppercase tracking-widest">Archive</button>
-                    </td>
+          <div>
+            <div className="flex justify-between items-center mb-8">
+               <h3 className="text-xl font-serif">Product Inventory</h3>
+               <button 
+                 onClick={() => setShowProductForm(!showProductForm)}
+                 className="bg-stone-900 text-white px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-[#F5A18C] transition-all"
+               >
+                 {showProductForm ? 'Close Form' : 'Catalog New Item'}
+               </button>
+            </div>
+
+            {showProductForm && (
+              <form onSubmit={handleAddProduct} className="mb-12 bg-stone-50 p-8 rounded-[2rem] border border-stone-100 animate-in slide-in-from-top-4 duration-300 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <input required type="text" placeholder="PRODUCT NAME" value={pName} onChange={e => setPName(e.target.value)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none" />
+                <input required type="number" step="0.01" placeholder="PRICE ($)" value={pPrice} onChange={e => setPPrice(e.target.value)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none" />
+                <select value={pCategory} onChange={e => setPCategory(e.target.value as any)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none cursor-pointer">
+                   <option>Ceramics</option>
+                   <option>Textiles</option>
+                   <option>Paintings</option>
+                   <option>DIY Kits</option>
+                   <option>Jewelry</option>
+                </select>
+                <input type="url" placeholder="IMAGE URL (leave blank for placeholder)" value={pImage} onChange={e => setPImage(e.target.value)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none" />
+                <textarea required placeholder="DESCRIPTION" value={pDesc} onChange={e => setPDesc(e.target.value)} className="md:col-span-2 bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none h-32" />
+                <label className="flex items-center gap-3 cursor-pointer">
+                   <input type="checkbox" checked={pIsLimited} onChange={e => setPIsLimited(e.target.checked)} className="rounded text-[#F5A18C] focus:ring-[#F5A18C]" />
+                   <span className="text-[10px] font-black uppercase tracking-widest text-stone-500">Mark as Limited Release</span>
+                </label>
+                <button type="submit" className="md:col-span-2 bg-[#F5A18C] text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-[#e08b76] transition-all shadow-lg">Submit to Catalog</button>
+              </form>
+            )}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-stone-50 border-b border-stone-100">
+                  <tr className="text-[9px] font-black uppercase tracking-widest text-stone-400">
+                    <th className="px-6 py-4">Piece</th>
+                    <th className="px-6 py-4">Category</th>
+                    <th className="px-6 py-4">Price</th>
+                    <th className="px-6 py-4">Limited</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-stone-50">
+                  {products.map(p => (
+                    <tr key={p.id} className="hover:bg-stone-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg overflow-hidden bg-stone-100">
+                             <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                          </div>
+                          <span className="font-serif text-sm">{p.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-[10px] font-bold text-stone-600 uppercase tracking-widest">{p.category}</td>
+                      <td className="px-6 py-4 font-light text-sm">${p.price.toFixed(2)}</td>
+                      <td className="px-6 py-4">
+                         {p.isLimited ? <span className="text-[8px] font-black uppercase tracking-widest bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Yes</span> : <span className="text-[8px] font-black uppercase tracking-widest bg-stone-100 text-stone-400 px-2 py-0.5 rounded">No</span>}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                         <button onClick={() => onDeleteProduct(p.id)} className="text-stone-400 hover:text-red-500 transition-colors text-[10px] font-black uppercase tracking-widest">Archive</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
         {tab === 'blogs' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-stone-50 border-b border-stone-100">
-                <tr className="text-[9px] font-black uppercase tracking-widest text-stone-400">
-                  <th className="px-6 py-4">Title</th>
-                  <th className="px-6 py-4">Author</th>
-                  <th className="px-6 py-4">Date</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-50">
-                {blogs.map(b => (
-                  <tr key={b.id} className="hover:bg-stone-50/50 transition-colors">
-                    <td className="px-6 py-4 font-serif text-sm">{b.title}</td>
-                    <td className="px-6 py-4 text-[10px] font-bold text-stone-600 uppercase tracking-widest">{b.author}</td>
-                    <td className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-stone-400">{b.date}</td>
-                    <td className="px-6 py-4 text-right">
-                       <button onClick={() => onDeleteBlog(b.id)} className="text-stone-400 hover:text-red-500 transition-colors text-[10px] font-black uppercase tracking-widest">Delete</button>
-                    </td>
+          <div>
+            <div className="flex justify-between items-center mb-8">
+               <h3 className="text-xl font-serif">Journal Archives</h3>
+               <button 
+                 onClick={() => setShowBlogForm(!showBlogForm)}
+                 className="bg-stone-900 text-white px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-[#F5A18C] transition-all"
+               >
+                 {showBlogForm ? 'Close Editor' : 'Compose New Story'}
+               </button>
+            </div>
+
+            {showBlogForm && (
+              <form onSubmit={handleAddBlog} className="mb-12 bg-stone-50 p-8 rounded-[2rem] border border-stone-100 animate-in slide-in-from-top-4 duration-300 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <input required type="text" placeholder="STORY TITLE" value={bTitle} onChange={e => setBTitle(e.target.value)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none" />
+                <input required type="text" placeholder="CATEGORY (e.g. Philosophy, Tutorial)" value={bCategory} onChange={e => setBCategory(e.target.value)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none" />
+                <input type="url" placeholder="FEATURED IMAGE URL" value={bImage} onChange={e => setBImage(e.target.value)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none" />
+                <input required type="text" placeholder="EXCERPT (SHORT SUMMARY)" value={bExcerpt} onChange={e => setBExcerpt(e.target.value)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none" />
+                <textarea required placeholder="STORY CONTENT" value={bContent} onChange={e => setBContent(e.target.value)} className="md:col-span-2 bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none h-48" />
+                <button type="submit" className="md:col-span-2 bg-[#F5A18C] text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-[#e08b76] transition-all shadow-lg">Publish to Journal</button>
+              </form>
+            )}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-stone-50 border-b border-stone-100">
+                  <tr className="text-[9px] font-black uppercase tracking-widest text-stone-400">
+                    <th className="px-6 py-4">Title</th>
+                    <th className="px-6 py-4">Author</th>
+                    <th className="px-6 py-4">Date</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-stone-50">
+                  {blogs.map(b => (
+                    <tr key={b.id} className="hover:bg-stone-50/50 transition-colors">
+                      <td className="px-6 py-4 font-serif text-sm">{b.title}</td>
+                      <td className="px-6 py-4 text-[10px] font-bold text-stone-600 uppercase tracking-widest">{b.author}</td>
+                      <td className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-stone-400">{b.date}</td>
+                      <td className="px-6 py-4 text-right">
+                         <button onClick={() => onDeleteBlog(b.id)} className="text-stone-400 hover:text-red-500 transition-colors text-[10px] font-black uppercase tracking-widest">Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
         {tab === 'users' && (
           <div className="overflow-x-auto">
+            <h3 className="text-xl font-serif mb-8">Registered Artisans & Collectors</h3>
             <table className="w-full text-left">
               <thead className="bg-stone-50 border-b border-stone-100">
                 <tr className="text-[9px] font-black uppercase tracking-widest text-stone-400">

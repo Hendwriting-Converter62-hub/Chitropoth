@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Page, Product, BlogPost, CartItem, User, Review, Order } from './types.ts';
 import { MOCK_PRODUCTS, MOCK_BLOGS } from './constants.tsx';
@@ -6,6 +5,7 @@ import Layout from './components/Layout.tsx';
 import ReviewSection from './components/ReviewSection.tsx';
 import ShareButtons from './components/ShareButtons.tsx';
 import { getCraftRecommendation, generateProductStory } from './services/geminiService.ts';
+import { supabase } from './lib/supabase.ts';
 
 // --- Sub-components ---
 
@@ -183,7 +183,7 @@ const HomeView: React.FC<{
     <section className="relative h-[70vh] sm:h-[60vh] md:h-[75vh] lg:h-[85vh] flex items-center bg-stone-100 overflow-hidden">
       <div className="absolute inset-0 z-0 opacity-50">
         <img 
-          src="https://images.unsplash.com/photo-1459749411177-0421800673e6?auto=format&fit=crop&q=80&w=1600" 
+          src="https://images.unsplash.com/photo-1513519245088-0e12902e35ca?q=80&w=1600&auto=format&fit=crop" 
           alt="Craft Background" 
           className="w-full h-full object-cover" 
         />
@@ -910,30 +910,50 @@ const CheckoutView: React.FC<{ cart: CartItem[], total: number, onComplete: () =
 
 const AuthView: React.FC<{
   onAuthComplete: (u: User) => void;
-  onRegister: (data: any) => boolean;
-  onLogin: (email: string, pass: string) => User | null;
-}> = ({ onAuthComplete, onRegister, onLogin }) => {
+}> = ({ onAuthComplete }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
-    if (isLogin) {
-      const user = onLogin(email, password);
-      if (user) onAuthComplete(user);
-      else setError('Invalid credentials. Please try again or join our studio.');
-    } else {
-      const success = onRegister({ name, email, password });
-      if (success) {
-        onAuthComplete({ name, email, isLoggedIn: true, isAdmin: false });
+    try {
+      if (isLogin) {
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) throw signInError;
+        if (data.user) {
+          onAuthComplete({
+            name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'Member',
+            email: data.user.email || '',
+            isLoggedIn: true,
+            isAdmin: data.user.email === 'ukaymongutsho@gmail.com'
+          });
+        }
       } else {
-        setError('This artisan email is already registered.');
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { full_name: name }
+          }
+        });
+        if (signUpError) throw signUpError;
+        alert('Artisan invitation sent. Please check your email to confirm your studio access.');
+        setIsLogin(true);
       }
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred during the journey.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -967,8 +987,10 @@ const AuthView: React.FC<{
           />
           <button 
             type="submit"
-            className="w-full bg-stone-900 text-white py-4 text-[10px] font-black uppercase tracking-[0.3em] rounded-2xl hover:bg-[#F5A18C] transition-all shadow-xl"
+            disabled={loading}
+            className="w-full bg-stone-900 text-white py-4 text-[10px] font-black uppercase tracking-[0.3em] rounded-2xl hover:bg-[#F5A18C] transition-all shadow-xl disabled:opacity-50 flex items-center justify-center gap-3"
           >
+            {loading && <div className="loading-spinner w-4 h-4 border-white border-l-stone-900"></div>}
             {isLogin ? 'Sign In' : 'Become a Member'}
           </button>
         </form>
@@ -990,17 +1012,27 @@ const AdminView: React.FC<{
   products: Product[];
   blogs: BlogPost[];
   user: User;
-  registeredUsers: any[];
   onAddProduct: (p: Product) => void;
   onUpdateProduct: (p: Product) => void;
   onDeleteProduct: (id: string) => void;
   onAddBlog: (b: BlogPost) => void;
   onUpdateBlog: (b: BlogPost) => void;
   onDeleteBlog: (id: string) => void;
-}> = ({ products, blogs, user, registeredUsers, onAddProduct, onUpdateProduct, onDeleteProduct, onAddBlog, onUpdateBlog, onDeleteBlog }) => {
+}> = ({ products, blogs, user, onAddProduct, onUpdateProduct, onDeleteProduct, onAddBlog, onUpdateBlog, onDeleteBlog }) => {
   const [tab, setTab] = useState<'products' | 'blogs' | 'users'>('products');
   const [showProductForm, setShowProductForm] = useState(false);
   const [showBlogForm, setShowBlogForm] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [registeredProfiles, setRegisteredProfiles] = useState<any[]>([]);
+
+  // Fetch profiles from Supabase
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      const { data, error } = await supabase.from('profiles').select('*');
+      if (!error && data) setRegisteredProfiles(data);
+    };
+    if (tab === 'users') fetchProfiles();
+  }, [tab]);
 
   // Form states for Product
   const [pName, setPName] = useState('');
@@ -1016,6 +1048,17 @@ const AdminView: React.FC<{
   const [bContent, setBContent] = useState('');
   const [bCategory, setBCategory] = useState('');
   const [bImage, setBImage] = useState('');
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleAddProduct = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1089,21 +1132,40 @@ const AdminView: React.FC<{
 
             {showProductForm && (
               <form onSubmit={handleAddProduct} className="mb-12 bg-stone-50 p-8 rounded-[2rem] border border-stone-100 animate-in slide-in-from-top-4 duration-300 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <input required type="text" placeholder="PRODUCT NAME" value={pName} onChange={e => setPName(e.target.value)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none" />
-                <input required type="number" step="0.01" placeholder="PRICE ($)" value={pPrice} onChange={e => setPPrice(e.target.value)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none" />
-                <select value={pCategory} onChange={e => setPCategory(e.target.value as any)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none cursor-pointer">
-                   <option>Ceramics</option>
-                   <option>Textiles</option>
-                   <option>Paintings</option>
-                   <option>DIY Kits</option>
-                   <option>Jewelry</option>
-                </select>
-                <input type="url" placeholder="IMAGE URL (leave blank for placeholder)" value={pImage} onChange={e => setPImage(e.target.value)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none" />
+                <div className="flex flex-col gap-6">
+                  <input required type="text" placeholder="PRODUCT NAME" value={pName} onChange={e => setPName(e.target.value)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none" />
+                  <input required type="number" step="0.01" placeholder="PRICE ($)" value={pPrice} onChange={e => setPPrice(e.target.value)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none" />
+                  <select value={pCategory} onChange={e => setPCategory(e.target.value as any)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none cursor-pointer">
+                    <option>Ceramics</option>
+                    <option>Textiles</option>
+                    <option>Paintings</option>
+                    <option>DIY Kits</option>
+                    <option>Jewelry</option>
+                  </select>
+                </div>
+                
+                <div className="flex flex-col gap-4">
+                  <div className="flex-grow flex flex-col items-center justify-center border-2 border-dashed border-stone-300 rounded-2xl p-4 bg-white hover:border-[#F5A18C] transition-colors group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                    {pImage ? (
+                      <img src={pImage} alt="Preview" className="h-32 w-auto object-contain rounded-lg" />
+                    ) : (
+                      <div className="text-center">
+                        <i className="fa-solid fa-cloud-arrow-up text-3xl text-stone-300 group-hover:text-[#F5A18C] mb-2"></i>
+                        <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Upload Product Image</p>
+                      </div>
+                    )}
+                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                  </div>
+                  <input type="url" placeholder="OR PROVIDE IMAGE URL" value={pImage} onChange={e => setPImage(e.target.value)} className="bg-white border border-stone-200 p-3 rounded-xl text-[9px] font-bold tracking-widest uppercase outline-none" />
+                </div>
+
                 <textarea required placeholder="DESCRIPTION" value={pDesc} onChange={e => setPDesc(e.target.value)} className="md:col-span-2 bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none h-32" />
+                
                 <label className="flex items-center gap-3 cursor-pointer">
                    <input type="checkbox" checked={pIsLimited} onChange={e => setPIsLimited(e.target.checked)} className="rounded text-[#F5A18C] focus:ring-[#F5A18C]" />
                    <span className="text-[10px] font-black uppercase tracking-widest text-stone-500">Mark as Limited Release</span>
                 </label>
+                
                 <button type="submit" className="md:col-span-2 bg-[#F5A18C] text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-[#e08b76] transition-all shadow-lg">Submit to Catalog</button>
               </form>
             )}
@@ -1208,16 +1270,17 @@ const AdminView: React.FC<{
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-50">
-                <tr className="bg-amber-50/30">
-                  <td className="px-6 py-4 font-bold text-sm">Ukay Mong Utsho (Chief Artisan)</td>
-                  <td className="px-6 py-4 text-stone-600 text-xs">ukaymongutsho@gmail.com</td>
-                  <td className="px-6 py-4"><span className="text-[8px] font-black uppercase tracking-widest bg-stone-900 text-white px-2 py-0.5 rounded">Administrator</span></td>
-                </tr>
-                {registeredUsers.map((u, i) => (
-                  <tr key={i} className="hover:bg-stone-50/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-sm">{u.name}</td>
-                    <td className="px-6 py-4 text-stone-600 text-xs">{u.email}</td>
-                    <td className="px-6 py-4 text-[8px] font-black uppercase tracking-widest text-stone-400">Collector</td>
+                {registeredProfiles.map((p, i) => (
+                  <tr key={p.id} className={`hover:bg-stone-50/50 transition-colors ${p.email === 'ukaymongutsho@gmail.com' ? 'bg-amber-50/30' : ''}`}>
+                    <td className="px-6 py-4 font-medium text-sm">{p.full_name || 'Member'}</td>
+                    <td className="px-6 py-4 text-stone-600 text-xs">{p.email}</td>
+                    <td className="px-6 py-4">
+                      {p.email === 'ukaymongutsho@gmail.com' ? (
+                        <span className="text-[8px] font-black uppercase tracking-widest bg-stone-900 text-white px-2 py-0.5 rounded">Administrator</span>
+                      ) : (
+                        <span className="text-[8px] font-black uppercase tracking-widest text-stone-400">Collector</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1229,60 +1292,76 @@ const AdminView: React.FC<{
   );
 };
 
-const ProfileView: React.FC<{ user: User, orders: Order[], onUpdateUser: (u: User) => void }> = ({ user, orders, onUpdateUser }) => (
-  <div className="max-w-7xl mx-auto px-4 py-16 md:py-24 animate-in fade-in duration-500">
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
-      <div className="lg:col-span-1 space-y-8">
-        <div className="bg-white border border-stone-100 rounded-[2rem] p-8 text-center shadow-sm">
-           <div className="w-24 h-24 bg-stone-100 rounded-full mx-auto mb-6 flex items-center justify-center text-3xl font-serif text-stone-400 uppercase">
-             {user.name.charAt(0)}
-           </div>
-           <h3 className="text-xl font-serif mb-1">{user.name}</h3>
-           <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-6">{user.email}</p>
-           <button className="w-full border border-stone-200 text-stone-600 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-stone-50 transition-all">Edit Account</button>
+const ProfileView: React.FC<{ user: User, orders: Order[], onUpdateUser: (u: User) => void }> = ({ user, orders, onUpdateUser }) => {
+  const [profile, setProfile] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchMyProfile = async () => {
+      const { data } = await supabase.from('profiles').select('*').eq('email', user.email).single();
+      if (data) setProfile(data);
+    };
+    fetchMyProfile();
+  }, [user.email]);
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-16 md:py-24 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
+        <div className="lg:col-span-1 space-y-8">
+          <div className="bg-white border border-stone-100 rounded-[2rem] p-8 text-center shadow-sm">
+             <div className="w-24 h-24 bg-stone-100 rounded-full mx-auto mb-6 flex items-center justify-center text-3xl font-serif text-stone-400 uppercase overflow-hidden">
+               {profile?.avatar_url ? (
+                 <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+               ) : (
+                 user.name.charAt(0)
+               )}
+             </div>
+             <h3 className="text-xl font-serif mb-1">{profile?.full_name || user.name}</h3>
+             <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-6">{user.email}</p>
+             <button className="w-full border border-stone-200 text-stone-600 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-stone-50 transition-all">Edit Account</button>
+          </div>
+        </div>
+
+        <div className="lg:col-span-3">
+          <h2 className="text-3xl font-serif mb-8">Artisan Journeys (Your Orders)</h2>
+          {orders.length === 0 ? (
+            <div className="p-16 bg-stone-50 rounded-[3rem] border border-stone-100 text-center">
+              <p className="text-stone-400 italic mb-6">You haven't initiated any journeys yet.</p>
+              <button className="text-[10px] font-black uppercase tracking-widest text-[#F5A18C] border-b-2 border-[#F5A18C] pb-1">Start Exploring</button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {orders.map(order => (
+                <div key={order.id} className="bg-white border border-stone-100 rounded-[2rem] overflow-hidden shadow-sm group">
+                  <div className="bg-stone-50 px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-stone-100">
+                     <div className="flex flex-wrap gap-6 text-[10px] font-black uppercase tracking-widest text-stone-500">
+                        <div><span className="text-stone-300 mr-2">Order</span> {order.id}</div>
+                        <div><span className="text-stone-300 mr-2">Initiated</span> {order.date}</div>
+                     </div>
+                     <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 bg-green-50 text-green-600 rounded-full border border-green-100">{order.status}</span>
+                        <span className="font-serif text-lg text-stone-900">${order.total.toFixed(2)}</span>
+                     </div>
+                  </div>
+                  <div className="p-8 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-6">
+                     {order.items.map(item => (
+                       <div key={item.id} className="space-y-2">
+                         <div className="aspect-[3/4] rounded-lg overflow-hidden bg-stone-100 shadow-sm">
+                           <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                         </div>
+                         <p className="text-[9px] font-bold text-stone-900 uppercase truncate">{item.name}</p>
+                         <p className="text-[8px] text-stone-400 uppercase tracking-widest font-black">Qty: {item.quantity}</p>
+                       </div>
+                     ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-
-      <div className="lg:col-span-3">
-        <h2 className="text-3xl font-serif mb-8">Artisan Journeys (Your Orders)</h2>
-        {orders.length === 0 ? (
-          <div className="p-16 bg-stone-50 rounded-[3rem] border border-stone-100 text-center">
-            <p className="text-stone-400 italic mb-6">You haven't initiated any journeys yet.</p>
-            <button className="text-[10px] font-black uppercase tracking-widest text-[#F5A18C] border-b-2 border-[#F5A18C] pb-1">Start Exploring</button>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {orders.map(order => (
-              <div key={order.id} className="bg-white border border-stone-100 rounded-[2rem] overflow-hidden shadow-sm group">
-                <div className="bg-stone-50 px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-stone-100">
-                   <div className="flex flex-wrap gap-6 text-[10px] font-black uppercase tracking-widest text-stone-500">
-                      <div><span className="text-stone-300 mr-2">Order</span> {order.id}</div>
-                      <div><span className="text-stone-300 mr-2">Initiated</span> {order.date}</div>
-                   </div>
-                   <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 bg-green-50 text-green-600 rounded-full border border-green-100">{order.status}</span>
-                      <span className="font-serif text-lg text-stone-900">${order.total.toFixed(2)}</span>
-                   </div>
-                </div>
-                <div className="p-8 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-6">
-                   {order.items.map(item => (
-                     <div key={item.id} className="space-y-2">
-                       <div className="aspect-[3/4] rounded-lg overflow-hidden bg-stone-100 shadow-sm">
-                         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                       </div>
-                       <p className="text-[9px] font-bold text-stone-900 uppercase truncate">{item.name}</p>
-                       <p className="text-[8px] text-stone-400 uppercase tracking-widest font-black">Qty: {item.quantity}</p>
-                     </div>
-                   ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const PrivacyView: React.FC = () => (
   <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 md:py-20 animate-in fade-in duration-500 prose prose-stone">
@@ -1350,23 +1429,43 @@ const App: React.FC = () => {
   const [blogs, setBlogs] = useState<BlogPost[]>(MOCK_BLOGS);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [user, setUser] = useState<User>({ name: '', email: '', isLoggedIn: false });
-  const [registeredUsers, setRegisteredUsers] = useState<any[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [aiTip, setAiTip] = useState<string>('');
   const [isAiLoading, setIsAiLoading] = useState(false);
 
-  // Persistence
+  // Supabase Auth State Persistence
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser({
+          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Member',
+          email: session.user.email || '',
+          isLoggedIn: true,
+          isAdmin: session.user.email === 'ukaymongutsho@gmail.com'
+        });
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({
+          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Member',
+          email: session.user.email || '',
+          isLoggedIn: true,
+          isAdmin: session.user.email === 'ukaymongutsho@gmail.com'
+        });
+      } else {
+        setUser({ name: '', email: '', isLoggedIn: false });
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Persistence for Cart & Orders
   useEffect(() => {
     const savedCart = localStorage.getItem('cart');
     if (savedCart) setCart(JSON.parse(savedCart));
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) setUser(JSON.parse(savedUser));
-    const savedProducts = localStorage.getItem('products');
-    if (savedProducts) setProducts(JSON.parse(savedProducts));
-    const savedBlogs = localStorage.getItem('blogs');
-    if (savedBlogs) setBlogs(JSON.parse(savedBlogs));
-    const savedUsers = localStorage.getItem('registeredUsers');
-    if (savedUsers) setRegisteredUsers(JSON.parse(savedUsers));
     const savedOrders = localStorage.getItem('orders');
     if (savedOrders) setOrders(JSON.parse(savedOrders));
   }, []);
@@ -1374,22 +1473,6 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('cart', JSON.stringify(cart));
   }, [cart]);
-
-  useEffect(() => {
-    localStorage.setItem('products', JSON.stringify(products));
-  }, [products]);
-
-  useEffect(() => {
-    localStorage.setItem('blogs', JSON.stringify(blogs));
-  }, [blogs]);
-
-  useEffect(() => {
-    localStorage.setItem('user', JSON.stringify(user));
-  }, [user]);
-
-  useEffect(() => {
-    localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
-  }, [registeredUsers]);
 
   useEffect(() => {
     localStorage.setItem('orders', JSON.stringify(orders));
@@ -1432,29 +1515,10 @@ const App: React.FC = () => {
     }));
   };
 
-  const handleLogout = () => {
-    const newUser = { name: '', email: '', isLoggedIn: false, isAdmin: false };
-    setUser(newUser);
-    localStorage.setItem('user', JSON.stringify(newUser));
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser({ name: '', email: '', isLoggedIn: false, isAdmin: false });
     setCurrentPage(Page.Home);
-  };
-
-  const handleRegister = (data: any) => {
-    const exists = registeredUsers.some(u => u.email.toLowerCase() === data.email.toLowerCase());
-    if (exists) return false;
-    setRegisteredUsers([...registeredUsers, { ...data }]);
-    return true;
-  };
-
-  const handleLogin = (email: string, pass: string): User | null => {
-    if (email.toLowerCase() === 'ukaymongutsho@gmail.com' && pass === 'Ukay@2345#') {
-      return { name: 'Chief Artisan (Admin)', email, isLoggedIn: true, isAdmin: true };
-    }
-    const found = registeredUsers.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === pass);
-    if (found) {
-      return { name: found.name, email: found.email, isLoggedIn: true, isAdmin: false };
-    }
-    return null;
   };
 
   const cartTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -1549,9 +1613,7 @@ const App: React.FC = () => {
         />;
       case Page.Auth: 
         return <AuthView 
-          onAuthComplete={(u) => { setUser(u); localStorage.setItem('user', JSON.stringify(u)); setCurrentPage(Page.Home); }} 
-          onRegister={handleRegister}
-          onLogin={handleLogin}
+          onAuthComplete={(u) => { setUser(u); setCurrentPage(Page.Home); }} 
         />;
       case Page.Admin:
         if (!user.isAdmin) return <HomeView 
@@ -1567,7 +1629,6 @@ const App: React.FC = () => {
           products={products}
           blogs={blogs}
           user={user}
-          registeredUsers={registeredUsers}
           onAddProduct={(p) => setProducts([p, ...products])}
           onUpdateProduct={(p) => setProducts(products.map(old => old.id === p.id ? p : old))}
           onDeleteProduct={(id) => setProducts(products.filter(p => p.id !== id))}

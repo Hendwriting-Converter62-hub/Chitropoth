@@ -32,10 +32,13 @@
     // Non-destructive shim for process.env
     window.process = window.process || {};
     window.process.env = window.process.env || {};
+    
+    // The Gemini API key is handled by the platform environment
     window.process.env.API_KEY = window.process.env.API_KEY || "";
-    // Inject Supabase credentials from the user's project details
+    
+    // Supabase credentials - strictly using the publishable key for frontend operations
     window.process.env.SUPABASE_URL = "https://mpjcwlslmhbfwqcgrwej.supabase.co";
-    window.process.env.SUPABASE_ANON_KEY = "sb_publishable_i--ESmBhoo62tY1TTJLS3Q_TA0GNa5e"; 
+    window.process.env.SUPABASE_ANON_KEY = "sb_publishable_i--ESmBhoo62tY1TTJLS3Q_TA0GNa5e";
 </script>
 <script type="importmap">
 {
@@ -52,7 +55,6 @@
 </head>
 <body class="bg-stone-50 text-stone-900">
     <div id="root"></div>
-    <!-- Entry point for the React application -->
     <script type="module" src="./index.tsx"></script>
 </body>
 </html>

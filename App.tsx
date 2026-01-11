@@ -1021,6 +1021,7 @@ const AdminView: React.FC<{
 }> = ({ products, blogs, user, onAddProduct, onUpdateProduct, onDeleteProduct, onAddBlog, onUpdateBlog, onDeleteBlog }) => {
   const [tab, setTab] = useState<'products' | 'blogs' | 'users'>('products');
   const [showProductForm, setShowProductForm] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [showBlogForm, setShowBlogForm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [registeredProfiles, setRegisteredProfiles] = useState<any[]>([]);
@@ -1049,6 +1050,28 @@ const AdminView: React.FC<{
   const [bCategory, setBCategory] = useState('');
   const [bImage, setBImage] = useState('');
 
+  const resetProductForm = () => {
+    setEditingProductId(null);
+    setPName('');
+    setPPrice('');
+    setPCategory('Ceramics');
+    setPImage('');
+    setPDesc('');
+    setPIsLimited(false);
+  };
+
+  const handleEditProduct = (p: Product) => {
+    setEditingProductId(p.id);
+    setPName(p.name);
+    setPPrice(p.price.toString());
+    setPCategory(p.category);
+    setPImage(p.image);
+    setPDesc(p.description);
+    setPIsLimited(!!p.isLimited);
+    setShowProductForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -1060,23 +1083,35 @@ const AdminView: React.FC<{
     }
   };
 
-  const handleAddProduct = (e: React.FormEvent) => {
+  const handleProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newP: Product = {
-      id: Date.now().toString(),
-      name: pName,
-      price: parseFloat(pPrice),
-      category: pCategory,
-      image: pImage || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=600',
-      description: pDesc,
-      rating: 5,
-      reviews: [],
-      isLimited: pIsLimited
-    };
-    onAddProduct(newP);
+    if (editingProductId) {
+      const updatedP: Product = {
+        ...products.find(p => p.id === editingProductId)!,
+        name: pName,
+        price: parseFloat(pPrice),
+        category: pCategory,
+        image: pImage,
+        description: pDesc,
+        isLimited: pIsLimited
+      };
+      onUpdateProduct(updatedP);
+    } else {
+      const newP: Product = {
+        id: Date.now().toString(),
+        name: pName,
+        price: parseFloat(pPrice),
+        category: pCategory,
+        image: pImage || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=600',
+        description: pDesc,
+        rating: 5,
+        reviews: [],
+        isLimited: pIsLimited
+      };
+      onAddProduct(newP);
+    }
     setShowProductForm(false);
-    // Reset form
-    setPName(''); setPPrice(''); setPDesc(''); setPImage(''); setPIsLimited(false);
+    resetProductForm();
   };
 
   const handleAddBlog = (e: React.FormEvent) => {
@@ -1121,52 +1156,83 @@ const AdminView: React.FC<{
         {tab === 'products' && (
           <div>
             <div className="flex justify-between items-center mb-8">
-               <h3 className="text-xl font-serif">Product Inventory</h3>
+               <h3 className="text-xl font-serif">{editingProductId ? 'Refine Artisan Piece' : 'Product Inventory'}</h3>
                <button 
-                 onClick={() => setShowProductForm(!showProductForm)}
+                 onClick={() => {
+                   if (showProductForm && editingProductId) resetProductForm();
+                   else {
+                    setShowProductForm(!showProductForm);
+                    if (!showProductForm) resetProductForm();
+                   }
+                 }}
                  className="bg-stone-900 text-white px-6 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-[#F5A18C] transition-all"
                >
-                 {showProductForm ? 'Close Form' : 'Catalog New Item'}
+                 {showProductForm ? 'Cancel Entry' : 'Catalog New Item'}
                </button>
             </div>
 
             {showProductForm && (
-              <form onSubmit={handleAddProduct} className="mb-12 bg-stone-50 p-8 rounded-[2rem] border border-stone-100 animate-in slide-in-from-top-4 duration-300 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <form onSubmit={handleProductSubmit} className="mb-12 bg-stone-50 p-8 rounded-[2rem] border border-stone-100 animate-in slide-in-from-top-4 duration-300 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="flex flex-col gap-6">
-                  <input required type="text" placeholder="PRODUCT NAME" value={pName} onChange={e => setPName(e.target.value)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none" />
-                  <input required type="number" step="0.01" placeholder="PRICE ($)" value={pPrice} onChange={e => setPPrice(e.target.value)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none" />
-                  <select value={pCategory} onChange={e => setPCategory(e.target.value as any)} className="bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none cursor-pointer">
-                    <option>Ceramics</option>
-                    <option>Textiles</option>
-                    <option>Paintings</option>
-                    <option>DIY Kits</option>
-                    <option>Jewelry</option>
-                  </select>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest ml-1">Piece Title</label>
+                    <input required type="text" placeholder="PRODUCT NAME" value={pName} onChange={e => setPName(e.target.value)} className="w-full bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none focus:ring-1 focus:ring-[#F5A18C]" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest ml-1">Acquisition Price ($)</label>
+                    <input required type="number" step="0.01" placeholder="PRICE ($)" value={pPrice} onChange={e => setPPrice(e.target.value)} className="w-full bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none focus:ring-1 focus:ring-[#F5A18C]" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest ml-1">Artisanal Category</label>
+                    <select value={pCategory} onChange={e => setPCategory(e.target.value as any)} className="w-full bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none cursor-pointer focus:ring-1 focus:ring-[#F5A18C]">
+                      <option>Ceramics</option>
+                      <option>Textiles</option>
+                      <option>Paintings</option>
+                      <option>DIY Kits</option>
+                      <option>Jewelry</option>
+                    </select>
+                  </div>
                 </div>
                 
                 <div className="flex flex-col gap-4">
-                  <div className="flex-grow flex flex-col items-center justify-center border-2 border-dashed border-stone-300 rounded-2xl p-4 bg-white hover:border-[#F5A18C] transition-colors group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                  <div className="flex-grow flex flex-col items-center justify-center border-2 border-dashed border-stone-300 rounded-2xl p-4 bg-white hover:border-[#F5A18C] transition-colors group cursor-pointer relative" onClick={() => fileInputRef.current?.click()}>
                     {pImage ? (
-                      <img src={pImage} alt="Preview" className="h-32 w-auto object-contain rounded-lg" />
+                      <div className="relative group/img h-full w-full flex items-center justify-center">
+                         <img src={pImage} alt="Preview" className="max-h-48 w-auto object-contain rounded-lg shadow-sm" />
+                         <div className="absolute inset-0 bg-stone-900/40 opacity-0 group-hover/img:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                            <span className="text-white text-[9px] font-black uppercase tracking-widest">Replace Photo</span>
+                         </div>
+                      </div>
                     ) : (
-                      <div className="text-center">
-                        <i className="fa-solid fa-cloud-arrow-up text-3xl text-stone-300 group-hover:text-[#F5A18C] mb-2"></i>
-                        <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Upload Product Image</p>
+                      <div className="text-center p-8">
+                        <i className="fa-solid fa-cloud-arrow-up text-4xl text-stone-200 group-hover:text-[#F5A18C] mb-4 transition-colors"></i>
+                        <p className="text-[10px] font-black text-stone-400 uppercase tracking-widest">Upload Artisan Frame</p>
+                        <p className="text-[8px] text-stone-300 uppercase tracking-widest mt-2">JPG, PNG, or WEBP supported</p>
                       </div>
                     )}
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
                   </div>
-                  <input type="url" placeholder="OR PROVIDE IMAGE URL" value={pImage} onChange={e => setPImage(e.target.value)} className="bg-white border border-stone-200 p-3 rounded-xl text-[9px] font-bold tracking-widest uppercase outline-none" />
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest ml-1">Or External Image URL</label>
+                    <input type="url" placeholder="HTTPS://IMAGE-URL.COM" value={pImage} onChange={e => setPImage(e.target.value)} className="w-full bg-white border border-stone-200 p-3 rounded-xl text-[9px] font-bold tracking-widest uppercase outline-none focus:ring-1 focus:ring-[#F5A18C]" />
+                  </div>
                 </div>
 
-                <textarea required placeholder="DESCRIPTION" value={pDesc} onChange={e => setPDesc(e.target.value)} className="md:col-span-2 bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none h-32" />
+                <div className="md:col-span-2 space-y-1">
+                  <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest ml-1">The Artisan's Story (Description)</label>
+                  <textarea required placeholder="DESCRIBE THE PIECE..." value={pDesc} onChange={e => setPDesc(e.target.value)} className="w-full bg-white border border-stone-200 p-4 rounded-xl text-xs font-bold tracking-widest uppercase outline-none h-32 focus:ring-1 focus:ring-[#F5A18C]" />
+                </div>
                 
-                <label className="flex items-center gap-3 cursor-pointer">
-                   <input type="checkbox" checked={pIsLimited} onChange={e => setPIsLimited(e.target.checked)} className="rounded text-[#F5A18C] focus:ring-[#F5A18C]" />
-                   <span className="text-[10px] font-black uppercase tracking-widest text-stone-500">Mark as Limited Release</span>
+                <label className="flex items-center gap-3 cursor-pointer group">
+                   <div className="relative flex items-center">
+                      <input type="checkbox" checked={pIsLimited} onChange={e => setPIsLimited(e.target.checked)} className="h-5 w-5 rounded border-stone-300 text-[#F5A18C] focus:ring-[#F5A18C] transition-all" />
+                   </div>
+                   <span className="text-[10px] font-black uppercase tracking-widest text-stone-500 group-hover:text-stone-700 transition-colors">Mark as Limited Release Piece</span>
                 </label>
                 
-                <button type="submit" className="md:col-span-2 bg-[#F5A18C] text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-[#e08b76] transition-all shadow-lg">Submit to Catalog</button>
+                <button type="submit" className="md:col-span-2 bg-[#F5A18C] text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-stone-900 transition-all shadow-lg transform active:scale-[0.99]">
+                   {editingProductId ? 'Update Archive Entry' : 'Commit to Catalog'}
+                </button>
               </form>
             )}
 
@@ -1174,31 +1240,50 @@ const AdminView: React.FC<{
               <table className="w-full text-left">
                 <thead className="bg-stone-50 border-b border-stone-100">
                   <tr className="text-[9px] font-black uppercase tracking-widest text-stone-400">
-                    <th className="px-6 py-4">Piece</th>
+                    <th className="px-6 py-4">Artisan Piece</th>
                     <th className="px-6 py-4">Category</th>
-                    <th className="px-6 py-4">Price</th>
-                    <th className="px-6 py-4">Limited</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
+                    <th className="px-6 py-4">Value</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Curation</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-50">
                   {products.map(p => (
-                    <tr key={p.id} className="hover:bg-stone-50/50 transition-colors">
+                    <tr key={p.id} className="hover:bg-stone-50/50 transition-colors group">
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg overflow-hidden bg-stone-100">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-xl overflow-hidden bg-stone-100 shadow-sm border border-stone-50">
                              <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
                           </div>
-                          <span className="font-serif text-sm">{p.name}</span>
+                          <span className="font-serif text-sm font-bold text-stone-800">{p.name}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-[10px] font-bold text-stone-600 uppercase tracking-widest">{p.category}</td>
-                      <td className="px-6 py-4 font-light text-sm">${p.price.toFixed(2)}</td>
                       <td className="px-6 py-4">
-                         {p.isLimited ? <span className="text-[8px] font-black uppercase tracking-widest bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Yes</span> : <span className="text-[8px] font-black uppercase tracking-widest bg-stone-100 text-stone-400 px-2 py-0.5 rounded">No</span>}
+                        <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest border border-stone-100 px-2 py-1 rounded-lg">{p.category}</span>
+                      </td>
+                      <td className="px-6 py-4 font-light text-sm text-stone-900">${p.price.toFixed(2)}</td>
+                      <td className="px-6 py-4">
+                         {p.isLimited ? (
+                           <span className="text-[8px] font-black uppercase tracking-widest bg-amber-50 text-amber-600 border border-amber-100 px-3 py-1 rounded-full">Limited</span>
+                         ) : (
+                           <span className="text-[8px] font-black uppercase tracking-widest bg-stone-50 text-stone-400 border border-stone-100 px-3 py-1 rounded-full">General</span>
+                         )}
                       </td>
                       <td className="px-6 py-4 text-right">
-                         <button onClick={() => onDeleteProduct(p.id)} className="text-stone-400 hover:text-red-500 transition-colors text-[10px] font-black uppercase tracking-widest">Archive</button>
+                         <div className="flex justify-end gap-4">
+                            <button 
+                              onClick={() => handleEditProduct(p)} 
+                              className="text-[#F5A18C] hover:text-stone-900 transition-colors text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5"
+                            >
+                               <i className="fa-solid fa-pen-nib"></i> Edit
+                            </button>
+                            <button 
+                              onClick={() => onDeleteProduct(p.id)} 
+                              className="text-stone-300 hover:text-red-500 transition-colors text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5"
+                            >
+                               <i className="fa-solid fa-box-archive"></i> Archive
+                            </button>
+                         </div>
                       </td>
                     </tr>
                   ))}
@@ -1308,7 +1393,7 @@ const ProfileView: React.FC<{ user: User, orders: Order[], onUpdateUser: (u: Use
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
         <div className="lg:col-span-1 space-y-8">
           <div className="bg-white border border-stone-100 rounded-[2rem] p-8 text-center shadow-sm">
-             <div className="w-24 h-24 bg-stone-100 rounded-full mx-auto mb-6 flex items-center justify-center text-3xl font-serif text-stone-400 uppercase overflow-hidden">
+             <div className="w-24 h-24 bg-stone-100 rounded-full mx-auto mb-6 flex items-center justify-center text-3xl font-serif text-stone-400 uppercase overflow-hidden border border-stone-50 shadow-inner">
                {profile?.avatar_url ? (
                  <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                ) : (
